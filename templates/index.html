@@ -1,0 +1,492 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Traffic Tracker</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff88;
+    --green-dim: #00ff8844;
+    --green-glow: #00ff8811;
+    --bg: #030a06;
+    --surface: #070f09;
+    --border: #1a3320;
+    --text: #c8ffd8;
+    --text-dim: #4a7a58;
+    --red: #ff3b3b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--green-glow) 1px, transparent 1px),
+      linear-gradient(90deg, var(--green-glow) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 2;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 48px;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .logo-dot {
+    width: 12px;
+    height: 12px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--green), 0 0 24px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.75); }
+  }
+
+  .title-block .label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .title-block h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-shadow: 0 0 20px var(--green-dim);
+    text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px;
+    margin-bottom: 28px;
+    position: relative;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 40px; height: 2px;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  .card:nth-child(2) { animation-delay: 0.05s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.25s; }
+
+  .card-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .corner {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-color: var(--green);
+    border-style: solid;
+    opacity: 0.4;
+  }
+  .corner.tl { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .corner.tr { top: -1px; right: -1px; border-width: 1px 1px 0 0; }
+  .corner.bl { bottom: -1px; left: -1px; border-width: 0 0 1px 1px; }
+  .corner.br { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+  .upload-zone {
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .upload-zone:hover {
+    border-color: var(--green);
+    background: var(--green-glow);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon { font-size: 36px; margin-bottom: 14px; display: block; }
+
+  .upload-zone p {
+    color: var(--text-dim);
+    font-size: 15px;
+    letter-spacing: 1px;
+  }
+
+  .filename {
+    margin-top: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+    display: none;
+  }
+
+  .btn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 15px;
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+
+  .btn:hover {
+    background: var(--green-dim);
+    box-shadow: 0 0 24px var(--green-dim);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ---- PROGRESS BAR ---- */
+  .progress-card {
+    display: none; /* shown by JS when processing starts */
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .progress-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 2px;
+  }
+
+  .progress-pct {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    transition: width 0.4s ease;
+    border-radius: 1px;
+  }
+
+  /* animated shimmer on the fill */
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 40px; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 1.2s ease infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-60px); }
+    100% { transform: translateX(60px); }
+  }
+
+  .progress-steps {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .step {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    transition: color 0.3s, border-color 0.3s;
+  }
+
+  .step.active {
+    color: var(--green);
+    border-color: var(--green);
+    box-shadow: 0 0 8px var(--green-dim);
+  }
+
+  /* ---- VIDEO ---- */
+  .video-wrapper {
+    position: relative;
+    background: #000;
+    border: 1px solid var(--border);
+  }
+
+
+
+  .video-wrapper::before {
+    content: '● REC';
+    position: absolute;
+    top: 12px; right: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--red);
+    letter-spacing: 2px;
+    z-index: 3;
+    animation: blink 1.2s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  video {
+    width: 100%;
+    max-height: 420px;
+    display: block;
+    object-fit: contain;
+    background: #000;
+  }
+
+  .report-pre {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    color: var(--text);
+    white-space: pre-wrap;
+    background: #000;
+    border: 1px solid var(--border);
+    padding: 24px;
+    border-radius: 2px;
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo-dot"></div>
+    <div class="title-block">
+      <div class="label">System Active — CV Module </div>
+      <h1>Traffic Tracker</h1>
+    </div>
+  </header>
+
+  <!-- Upload Card -->
+  <div class="card">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="card-label">// Input — Upload Traffic Feed</div>
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <div class="upload-zone">
+        <input type="file" name="video" accept="video/*" id="fileInput">
+        <span class="upload-icon">📹</span>
+        <p>Drop video file here or click to browse</p>
+        <div class="filename" id="filename"></div>
+      </div>
+      <button type="submit" class="btn" id="submitBtn">▶ &nbsp; Run Analysis</button>
+    </form>
+  </div>
+
+  <!-- Progress Card (hidden until processing starts) -->
+  <div class="card progress-card" id="progressCard">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="card-label">// Processing — Running Analysis</div>
+    <div class="progress-header">
+      <span class="progress-status" id="progressStatus">INITIALIZING...</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-steps">
+      <span class="step" id="step1">YOLO DETECTION</span>
+      <span class="step" id="step2">BYTETRACK</span>
+      <span class="step" id="step3">ANNOTATING</span>
+      <span class="step" id="step4">ENCODING</span>
+    </div>
+  </div>
+
+  <!-- Result Video -->
+  {% if result_video %}
+  <div class="card">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="card-label">// Output — Annotated Feed</div>
+    <div class="video-wrapper">
+      <video controls>
+        <source src="{{ result_video }}?t={{ range(1, 99999) | random }}" type="video/mp4">
+      </video>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Report -->
+  {% if report_text %}
+  <div class="card">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div class="card-label">// Analytics Report</div>
+    <pre class="report-pre">{{ report_text }}</pre>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const filenameEl = document.getElementById('filename');
+  const submitBtn = document.getElementById('submitBtn');
+  const progressCard = document.getElementById('progressCard');
+  const progressFill = document.getElementById('progressFill');
+  const progressPct = document.getElementById('progressPct');
+  const progressStatus = document.getElementById('progressStatus');
+
+  // Show filename when file is picked
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      filenameEl.textContent = '► ' + fileInput.files[0].name;
+      filenameEl.style.display = 'block';
+    }
+  });
+
+  // On submit — show progress bar and start polling
+  document.getElementById('uploadForm').addEventListener('submit', () => {
+    submitBtn.textContent = '⟳  Uploading...';
+    submitBtn.disabled = true;
+
+    // Show progress card
+    progressCard.style.display = 'block';
+
+    // Start polling /progress every second
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/progress');
+        const data = await res.json();
+        const pct = data.progress || 0;
+
+        progressFill.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
+
+        // Update step indicators based on progress
+        if (pct >= 1)  { document.getElementById('step1').classList.add('active'); }
+        if (pct >= 30) { document.getElementById('step2').classList.add('active'); }
+        if (pct >= 60) { document.getElementById('step3').classList.add('active'); }
+        if (pct >= 95) {
+          document.getElementById('step4').classList.add('active');
+          progressStatus.textContent = 'ENCODING VIDEO...';
+        } else {
+          progressStatus.textContent = 'ANALYZING FRAMES...';
+        }
+
+        if (data.done) {
+          clearInterval(interval);
+          progressStatus.textContent = 'COMPLETE';
+          progressFill.style.width = '100%';
+          progressPct.textContent = '100%';
+        }
+
+      } catch (e) {
+        // still loading, keep polling
+      }
+    }, 1000);
+  });
+</script>
+
+</body>
+</html>
