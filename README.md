@@ -70,7 +70,7 @@ Real-time vehicle detection and tracking system built with YOLOv8 + ByteTrack.
 
 \- Brief false detections at frame edges may inflate the unique object count
 
-![Dashboard](screenshot.png)
+![Dashboard](image.png)
 
 ```
 
