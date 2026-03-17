@@ -459,8 +459,9 @@ with open("tracking_report.txt", "w") as f:
     type_counts = {name: 0 for name in class_names.values()}
 
     for tid, cid in vehicle_type.items():
-        name = class_names.get(cid, "Unknown")
-        type_counts[name] += 1
+        if track_frames.get(tid, 0) >= 10:  # same threshold as stable counter
+            name = class_names.get(cid, "Unknown")
+            type_counts[name] += 1
 
     f.write("Vehicle Type Breakdown\n")
     f.write("---------------------------\n")
