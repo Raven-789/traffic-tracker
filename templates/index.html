@@ -366,12 +366,13 @@
     </div>
   </header>
 
-  <!-- Upload Card -->
+<!-- Upload Card -->
   <div class="card">
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
     <div class="card-label">// Input — Upload Traffic Feed</div>
-    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+    <div id="errorBox" style="display:none; color: red; margin-bottom: 10px;"></div>
+    <form id="uploadForm">
       <div class="upload-zone">
         <input type="file" name="video" accept="video/*" id="fileInput">
         <span class="upload-icon">📹</span>
@@ -402,29 +403,25 @@
     </div>
   </div>
 
-  <!-- Result Video -->
-  {% if result_video %}
-  <div class="card">
+  <!-- Result Video (hidden until processing finishes) -->
+  <div class="card" id="resultCard" style="display:none;">
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
     <div class="card-label">// Output — Annotated Feed</div>
     <div class="video-wrapper">
-      <video controls>
-        <source src="{{ result_video }}?t={{ range(1, 99999) | random }}" type="video/mp4">
+      <video controls id="resultVideo">
+        <source src="" id="resultVideoSource" type="video/mp4">
       </video>
     </div>
   </div>
-  {% endif %}
 
-  <!-- Report -->
-  {% if report_text %}
-  <div class="card">
+  <!-- Report (hidden until processing finishes) -->
+  <div class="card" id="reportCard" style="display:none;">
     <div class="corner tl"></div><div class="corner tr"></div>
     <div class="corner bl"></div><div class="corner br"></div>
     <div class="card-label">// Analytics Report</div>
-    <pre class="report-pre">{{ report_text }}</pre>
+    <pre class="report-pre" id="reportText"></pre>
   </div>
-  {% endif %}
 
 </div>
 
@@ -436,6 +433,9 @@
   const progressFill = document.getElementById('progressFill');
   const progressPct = document.getElementById('progressPct');
   const progressStatus = document.getElementById('progressStatus');
+  const errorBox = document.getElementById('errorBox');
+  const resultCard = document.getElementById('resultCard');
+  const reportCard = document.getElementById('reportCard');
 
   // Show filename when file is picked
   fileInput.addEventListener('change', () => {
@@ -445,25 +445,65 @@
     }
   });
 
-  // On submit — show progress bar and start polling
-  document.getElementById('uploadForm').addEventListener('submit', () => {
+  function resetButton() {
+    submitBtn.textContent = '▶  Run Analysis';
+    submitBtn.disabled = false;
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.style.display = 'block';
+  }
+
+  // On submit — send file via fetch instead of a normal page reload,
+  // then poll /progress, then fetch /result when done.
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // stop the browser from doing a full page reload
+
+    errorBox.style.display = 'none';
+    resultCard.style.display = 'none';
+    reportCard.style.display = 'none';
+
     submitBtn.textContent = '⟳  Uploading...';
     submitBtn.disabled = true;
 
-    // Show progress card
+    const formData = new FormData();
+    formData.append('video', fileInput.files[0]);
+
+    let uploadResponse;
+    try {
+      uploadResponse = await fetch('/upload', {
+        method: 'POST',
+        body: formData
+      });
+    } catch (err) {
+      showError('Could not reach the server. Is it still running?');
+      resetButton();
+      return;
+    }
+
+const uploadData = await uploadResponse.json();
+
+    if (!uploadResponse.ok || uploadData.error) {
+      showError(uploadData.error || 'Upload failed.');
+      resetButton();
+      return;
+    }
+
+    const jobId = uploadData.job_id; // remember which job this is
+
+    // Upload accepted, processing started in the background.
     progressCard.style.display = 'block';
 
-    // Start polling /progress every second
     const interval = setInterval(async () => {
       try {
-        const res = await fetch('/progress');
+        const res = await fetch('/progress?job_id=' + jobId);
         const data = await res.json();
         const pct = data.progress || 0;
 
         progressFill.style.width = pct + '%';
         progressPct.textContent = pct + '%';
 
-        // Update step indicators based on progress
         if (pct >= 1)  { document.getElementById('step1').classList.add('active'); }
         if (pct >= 30) { document.getElementById('step2').classList.add('active'); }
         if (pct >= 60) { document.getElementById('step3').classList.add('active'); }
@@ -479,6 +519,19 @@
           progressStatus.textContent = 'COMPLETE';
           progressFill.style.width = '100%';
           progressPct.textContent = '100%';
+
+          // Fetch the finished video + report and show them.
+          const resultRes = await fetch('/result?job_id=' + jobId);
+          const resultData = await resultRes.json();
+
+          document.getElementById('resultVideoSource').src =
+            resultData.result_video + '?t=' + Date.now(); // cache-bust
+          document.getElementById('resultVideo').load();
+          document.getElementById('reportText').textContent = resultData.report_text;
+
+          resultCard.style.display = 'block';
+          reportCard.style.display = 'block';
+          resetButton();
         }
 
       } catch (e) {

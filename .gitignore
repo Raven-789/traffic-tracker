@@ -211,3 +211,7 @@ uploads/*
 *.mp4
 *.pt
 tracking_report.txt
+
+
+tracking_report_*.txt
+static/progress_*.json

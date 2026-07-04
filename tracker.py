@@ -2,32 +2,30 @@ from ultralytics import YOLO
 import cv2
 import supervision as sv
 import sys
-import subprocess as sp  # ✅ for ffmpeg re-encoding
+import subprocess as sp  # for ffmpeg re-encoding
 import json
 
 video_path = sys.argv[1]
-
-# -------------------------
-# 1️⃣ Load Model
-# -------------------------
+job_id = sys.argv[2]  # unique ID for this specific upload, passed in by app.py
 
 model = YOLO("yolov8n.pt")
 
 cap = cv2.VideoCapture(video_path)
 
-# -------------------------
-# Output Video Setup
-# -------------------------
-
-output_path = "static/output_raw.mp4"
+# Output Video Setup — filenames now include job_id so concurrent
+# uploads never overwrite each other's files.
+raw_output_path = f"static/output_raw_{job_id}.mp4"
+final_output_path = f"static/output_{job_id}.mp4"
+progress_path = f"static/progress_{job_id}.json"
+report_path = f"tracking_report_{job_id}.txt"
 
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-fps = cap.get(cv2.CAP_PROP_FPS)  # ✅ FIX: restored fps — was commented out but still used in report
+fps = cap.get(cv2.CAP_PROP_FPS)
 
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+out = cv2.VideoWriter(raw_output_path, fourcc, fps, (width, height))
 
 tracker = sv.ByteTrack()
 
@@ -35,29 +33,16 @@ box_annotator = sv.BoxAnnotator()
 label_annotator = sv.LabelAnnotator()
 trace_annotator = sv.TraceAnnotator()
 
-# -----------------------------------------------------------------------------------------------------------------------------
-# 2️⃣ Car Counter Setup
-# -----------------------------------------------------------------------------------------------------------------------------
-
 car_count = 0
 track_frames = {}
-
-# -------------------------
-# 3️⃣ Analytics Setup
-# -------------------------
 
 object_time = {}
 max_objects = 0
 
-# ✅ Get total frame count for progress tracking
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_num = 0
 
-vehicle_type = {}  # ✅ stores class ID per tracker ID (was declared but never filled before)
-
-# -------------------------
-# 4️⃣ Main Loop
-# -------------------------
+vehicle_type = {}
 
 while True:
 
@@ -68,32 +53,21 @@ while True:
 
     frame_num += 1
 
-    # ✅ Write progress percentage to file so Flask can read it
+    # Write progress percentage to THIS job's own progress file
     if total_frames > 0:
         progress = int((frame_num / total_frames) * 100)
-        with open("static/progress.json", "w") as pf:
-            json.dump({"progress": progress}, pf)
+        with open(progress_path, "w") as pf:
+            json.dump({"progress": progress, "done": False}, pf)
 
-    # Run YOLO detection
     results = model(frame, verbose=False)[0]
 
-    # Convert detections
     detections = sv.Detections.from_ultralytics(results)
-
-    # -------------------------
-    # Keep Only Vehicles
-    # -------------------------
 
     vehicle_classes = [2, 3, 5, 7]  # car, motorcycle, bus, truck
     mask = [cls in vehicle_classes for cls in detections.class_id]
     detections = detections[mask]
 
-    # Track objects
     detections = tracker.update_with_detections(detections)
-
-    # -----------------------------------------------------------------------------------------------------------------------------
-    # Stable Counting
-    # -----------------------------------------------------------------------------------------------------------------------------
 
     if detections.tracker_id is not None:
 
@@ -107,95 +81,67 @@ while True:
             if track_frames[tracker_id] == 10:
                 car_count += 1
 
-    # -----------------------------------------------------------------------------------------------------------------------------
-    # Time-in-frame tracking
-    # -----------------------------------------------------------------------------------------------------------------------------
-
     if detections.tracker_id is not None:
 
         current_ids = detections.tracker_id
 
-        for tracker_id, class_id in zip(detections.tracker_id, detections.class_id):  # ✅ CHANGED: added class_id alongside tracker_id
+        for tracker_id, class_id in zip(detections.tracker_id, detections.class_id):
 
             if tracker_id not in object_time:
                 object_time[tracker_id] = 0
-                vehicle_type[tracker_id] = class_id  # ✅ ADDED: save vehicle type when first seen
+                vehicle_type[tracker_id] = class_id
 
             object_time[tracker_id] += 1
 
         max_objects = max(max_objects, len(current_ids))
 
-    # Create labels
     labels = [
         f"ID {tracker_id}"
         for tracker_id in detections.tracker_id
     ]
 
-    # Draw bounding boxes
     annotated_frame = box_annotator.annotate(
         scene=frame,
         detections=detections
     )
 
-    # Draw labels
     annotated_frame = label_annotator.annotate(
         scene=annotated_frame,
         detections=detections,
         labels=labels
     )
 
-    # Draw motion trails
     annotated_frame = trace_annotator.annotate(
         scene=annotated_frame,
         detections=detections
     )
 
-    # -------------------------
-    # Display Counter
-    # -------------------------
-
     cv2.putText(
         annotated_frame,
-        # for stable count----------------------------------------------
         f"Total Vehicles: {car_count}",
-        # for frame by frame count-------------------------------------
-        # f"Total Vehicles: {len(object_time)}",
-
-        (50,50),
+        (50, 50),
         cv2.FONT_HERSHEY_SIMPLEX,
-        1,      # Font scale
-        (0,255,0),
-        3       # thickness
+        1,
+        (0, 255, 0),
+        3
     )
 
-    # save processed frame
     out.write(annotated_frame)
 
-    # Show frame
-    # cv2.imshow("Traffic Analytics", annotated_frame)
-
-# -------------------------
-# 5️⃣ Generate Text Report
-# -------------------------
-
-with open("tracking_report.txt", "w") as f:
+with open(report_path, "w") as f:
 
     f.write("Tracking Report\n")
     f.write("---------------------------\n")
 
-    # if you don't want frame by frame count
     f.write(f"Unique Vehicles: {car_count}\n")
-    # this for exact frame tracking even if the obj disappears
-    # f.write(f"Unique Objects: {len(object_time)}\n")
 
     f.write(f"Max Simultaneous Objects: {max_objects}\n\n")
 
-    # ✅ ADDED: Vehicle type breakdown
     class_names = {2: "Cars", 3: "Motorcycles", 5: "Buses", 7: "Trucks"}
     type_counts = {name: 0 for name in class_names.values()}
 
     for tid, cid in vehicle_type.items():
-        if track_frames.get(tid, 0) >= 10:  # same threshold as stable counter
+        if track_frames.get(tid, 0) >= 10:
             name = class_names.get(cid, "Unknown")
             type_counts[name] += 1
 
@@ -216,15 +162,15 @@ out.release()
 cap.release()
 cv2.destroyAllWindows()
 
-# ✅ Re-encode to H.264 (libx264) so browser can play it
+# Re-encode to H.264 (libx264) so browser can play it
 sp.run([
     "ffmpeg", "-y",
-    "-i", "static/output_raw.mp4",
+    "-i", raw_output_path,
     "-vcodec", "libx264",
     "-pix_fmt", "yuv420p",
-    "static/output.mp4"
+    final_output_path
 ])
 
-# ✅ Mark progress as done
-with open("static/progress.json", "w") as pf:
+# Mark progress as done, on THIS job's own progress file
+with open(progress_path, "w") as pf:
     json.dump({"progress": 100, "done": True}, pf)
