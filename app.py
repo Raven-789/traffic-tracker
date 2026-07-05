@@ -25,8 +25,16 @@ def allowed_file(filename):
 def run_tracker(filepath, job_id):
     # Runs in a separate thread. This does NOT block Flask from
     # answering other requests (like /progress) while it works.
-    subprocess.run([sys.executable, "tracker.py", filepath, job_id])
-
+    try:
+        result = subprocess.run(
+            [sys.executable, "tracker.py", filepath, job_id],
+            capture_output=True, text=True
+        )
+        print(f"[{job_id}] tracker.py finished with exit code {result.returncode}", flush=True)
+        print(f"[{job_id}] STDOUT:\n{result.stdout}", flush=True)
+        print(f"[{job_id}] STDERR:\n{result.stderr}", flush=True)
+    except Exception as e:
+        print(f"[{job_id}] run_tracker itself crashed: {e}", flush=True)
 
 @app.errorhandler(413)
 def file_too_large(e):
