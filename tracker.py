@@ -4,46 +4,36 @@ import supervision as sv
 import sys
 import subprocess as sp  # for ffmpeg re-encoding
 import json
-
+print("Step 1: starting, about to load YOLO model", flush=True)
 video_path = sys.argv[1]
 job_id = sys.argv[2]  # unique ID for this specific upload, passed in by app.py
-
 model = YOLO("yolov8n.pt")
-
+print("Step 2: YOLO model loaded successfully", flush=True)
 cap = cv2.VideoCapture(video_path)
-
+print("Step 3: video capture opened", flush=True)
 # Output Video Setup — filenames now include job_id so concurrent
 # uploads never overwrite each other's files.
 raw_output_path = f"static/output_raw_{job_id}.mp4"
 final_output_path = f"static/output_{job_id}.mp4"
 progress_path = f"static/progress_{job_id}.json"
 report_path = f"tracking_report_{job_id}.txt"
-
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 fps = cap.get(cv2.CAP_PROP_FPS)
-
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
 out = cv2.VideoWriter(raw_output_path, fourcc, fps, (width, height))
-
 tracker = sv.ByteTrack()
-
 box_annotator = sv.BoxAnnotator()
 label_annotator = sv.LabelAnnotator()
 trace_annotator = sv.TraceAnnotator()
-
 car_count = 0
 track_frames = {}
-
 object_time = {}
 max_objects = 0
-
 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 frame_num = 0
-
 vehicle_type = {}
-
+print("Step 4: entering frame processing loop", flush=True)
 while True:
 
     ret, frame = cap.read()
