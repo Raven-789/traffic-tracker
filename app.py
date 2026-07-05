@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 import subprocess
 import threading
 import uuid
+import sys
 import os
 import json
 
@@ -24,7 +25,7 @@ def allowed_file(filename):
 def run_tracker(filepath, job_id):
     # Runs in a separate thread. This does NOT block Flask from
     # answering other requests (like /progress) while it works.
-    subprocess.run(["python", "tracker.py", filepath, job_id])
+    subprocess.run([sys.executable, "tracker.py", filepath, job_id])
 
 
 @app.errorhandler(413)
